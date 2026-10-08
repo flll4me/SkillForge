@@ -4,6 +4,7 @@ import type { Database, DatabaseClient } from '../types/database.js';
 import { requireRole } from '../middleware/require-role.js';
 import { sendApiError } from '../utils/api-error.js';
 import { withTransaction } from '../utils/transaction.js';
+import { getAdminStatistics } from '../services/admin-statistics.js';
 
 const difficultySchema = z.enum(['EASY', 'MEDIUM', 'HARD']);
 const typeSchema = z.enum(['SINGLE_CHOICE', 'MULTIPLE_CHOICE']);
@@ -66,17 +67,11 @@ export function createAdminRouter(database: Database, jwtSecret: string) {
   const router = Router();
   router.use(...requireRole(database, jwtSecret, 'ADMIN'));
 
-  router.get('/statistics', async (_request, response) => {
+  router.get('/statistics', async (request, response) => {
+    const days = Number(request.query.days ?? 30);
+    if (![7, 30, 90].includes(days)) return sendApiError(response, 400, 'VALIDATION_ERROR', 'Choose 7, 30 or 90 days.');
     try {
-      const result = await database.query(
-        `SELECT
-           (SELECT COUNT(*)::int FROM users) AS users,
-           (SELECT COUNT(*)::int FROM questions WHERE is_active = TRUE) AS questions,
-           (SELECT COUNT(*)::int FROM skills WHERE is_active = TRUE) AS skills,
-           (SELECT COUNT(*)::int FROM interviews) AS interviews,
-           COALESCE((SELECT ROUND(AVG(score), 2) FROM interviews WHERE status = 'COMPLETED'), 0) AS "averageScore"`,
-      );
-      return response.json({ data: result.rows[0] });
+      return response.json({ data: await getAdminStatistics(database, days) });
     } catch {
       return sendApiError(response, 503, 'DATABASE_UNAVAILABLE', 'Statistics are temporarily unavailable.');
     }

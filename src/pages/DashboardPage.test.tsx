@@ -1,7 +1,7 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getUserSkills, getUserStatistics } from '../api/interviews.js';
+import { getInterviewHistory, getUserSkills, getUserStatistics } from '../api/interviews.js';
 import { DashboardPage } from './DashboardPage.js';
 
 vi.mock('../auth/AuthContext.js', () => ({
@@ -10,6 +10,7 @@ vi.mock('../auth/AuthContext.js', () => ({
 vi.mock('../api/interviews.js', () => ({
   getUserSkills: vi.fn(),
   getUserStatistics: vi.fn(),
+  getInterviewHistory: vi.fn(),
 }));
 
 beforeEach(() => {
@@ -20,16 +21,22 @@ beforeEach(() => {
     lastInterviewAt: '2026-10-06T10:00:00Z',
     recentInterview: { id: 42, skill: 'JavaScript', difficulty: 'MEDIUM', score: 80, status: 'COMPLETED', completedAt: '2026-10-06T10:00:00Z' },
   });
-  vi.mocked(getUserSkills).mockResolvedValue([]);
+  vi.mocked(getUserSkills).mockResolvedValue([
+    { id: 1, name: 'JavaScript', score: 82, completedInterviews: 1, updatedAt: '2026-10-06T10:00:00Z' },
+  ]);
+  vi.mocked(getInterviewHistory).mockResolvedValue([
+    { id: 42, skill: 'JavaScript', difficulty: 'MEDIUM', score: 80, status: 'COMPLETED', startedAt: '2026-10-06T09:00:00Z', completedAt: '2026-10-06T10:00:00Z' },
+  ]);
 });
 
-describe('dashboard recent interview', () => {
-  it('shows the latest interview and links to its result', async () => {
+describe('personal dashboard', () => {
+  it('shows progress widgets, latest interview, and a link to its result', async () => {
     render(<MemoryRouter><DashboardPage /></MemoryRouter>);
 
-    expect(await screen.findByRole('heading', { name: 'Последнее интервью' })).toBeInTheDocument();
-    expect(screen.getByText('JavaScript')).toBeInTheDocument();
-    expect(within(screen.getByRole('region', { name: 'Последнее интервью' })).getByText('80%')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Открыть результат' })).toHaveAttribute('href', '/interview/42/result');
+    expect(await screen.findByRole('heading', { name: 'Динамика результатов' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Навыки' })).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'JavaScript' })).toHaveAttribute('aria-valuenow', '82');
+    expect(screen.getByRole('img', { name: 'Результаты последних интервью' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Результат интервью по теме JavaScript: 80%' })).toHaveAttribute('href', '/interview/42/result');
   });
 });

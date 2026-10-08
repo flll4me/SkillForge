@@ -26,6 +26,8 @@ npm run migrate:api
 
 `INTERVIEW_QUESTION_COUNT` controls how many questions are assigned to each interview. It defaults to 10 and accepts values from 1 to 100.
 
+For AI explanations after an interview, create a Groq API key at [console.groq.com/keys](https://console.groq.com/keys) and add it to `.env` as `GROQ_API_KEY=...` (the key stays on the backend and is not sent to the browser). `GROQ_MODEL` is optional and defaults to `openai/gpt-oss-20b`. The backend sends missed question text and selected/correct answers to Groq to generate explanations; personal account fields are not included. Groq's free tier has rate limits. Without a key, the result page still displays the score and correct answers and offers a retry after configuration.
+
 Start the API and frontend in separate terminals:
 
 ```powershell
@@ -91,7 +93,7 @@ Sign out and back in after changing the role so the new JWT includes it.
 | Authentication | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me` |
 | User | `GET/PATCH /api/users/me`, `GET /api/users/me/statistics`, `GET /api/users/me/skills`, `GET /api/users/me/progress` |
 | Skills | `GET /api/skills` |
-| Interviews | `POST/GET /api/interviews`, `GET /api/interviews/:id`, `GET /api/interviews/:id/current-question`, `POST /api/interviews/:id/answer`, `GET /api/interviews/:id/result` |
+| Interviews | `POST/GET /api/interviews`, `GET /api/interviews/:id`, `GET /api/interviews/:id/current-question`, `POST /api/interviews/:id/answer`, `GET /api/interviews/:id/result`, `POST /api/interviews/:id/analysis` |
 | Admin | `/api/admin/users`, `/api/admin/skills`, `/api/admin/questions`, `/api/admin/statistics` |
 
 All API responses use JSON. Errors use `{ "error": { "code": "...", "message": "..." } }`.

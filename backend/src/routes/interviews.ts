@@ -7,6 +7,7 @@ import { sendApiError } from '../utils/api-error.js';
 import { HttpError } from '../utils/http-error.js';
 import { withTransaction } from '../utils/transaction.js';
 import { shuffleOptionsForQuestion } from '../services/option-order.js';
+import { explainAnswersWithGroq, type AnswerForExplanation, type AnswerExplanationResult } from '../services/answer-explainer.js';
 
 const difficultySchema = z.enum(['EASY', 'MEDIUM', 'HARD']);
 const createSchema = z.object({ skillId: z.coerce.number().int().positive(), difficulty: difficultySchema });
@@ -105,7 +106,12 @@ function respondToError(error: unknown, response: Parameters<typeof sendApiError
   return sendApiError(response, 500, 'INTERNAL_ERROR', 'The request could not be completed.');
 }
 
-export function createInterviewRouter(database: Database, jwtSecret: string, questionCount: number) {
+export function createInterviewRouter(
+  database: Database,
+  jwtSecret: string,
+  questionCount: number,
+  explainAnswers: (answers: AnswerForExplanation[]) => Promise<AnswerExplanationResult> = explainAnswersWithGroq,
+) {
   const router = Router();
   router.use(requireAuth(jwtSecret));
 
@@ -433,6 +439,56 @@ export function createInterviewRouter(database: Database, jwtSecret: string, que
         },
       });
     } catch (error) {
+      return respondToError(error, response);
+    }
+  });
+
+  router.post('/:id/analysis', async (request, response) => {
+    const parsedId = idSchema.safeParse(request.params.id);
+    if (!parsedId.success) return sendApiError(response, 400, 'VALIDATION_ERROR', 'Interview id must be a positive integer.');
+    try {
+      const interview = await findOwnedInterview(database, parsedId.data, request.auth!.userId);
+      if (interview.status !== 'COMPLETED') {
+        return sendApiError(response, 409, 'INTERVIEW_NOT_COMPLETED', 'Complete the interview before requesting an explanation.');
+      }
+
+      const rows = await database.query<{
+        order: number; question: string; difficulty: Difficulty; correct_answer: string; selected_answer: string | null; is_correct: boolean;
+      }>(
+        `SELECT assignment.question_order AS "order", question.text AS question, question.difficulty,
+                STRING_AGG(DISTINCT correct_option.text, E'\\n' ORDER BY correct_option.text) AS correct_answer,
+                STRING_AGG(DISTINCT selected_option.text, E'\\n' ORDER BY selected_option.text) AS selected_answer,
+                answer.is_correct
+         FROM interview_questions AS assignment
+         JOIN questions AS question ON question.id = assignment.question_id
+         JOIN user_answers AS answer ON answer.interview_question_id = assignment.id
+         JOIN question_options AS correct_option ON correct_option.question_id = question.id AND correct_option.is_correct = TRUE
+         LEFT JOIN user_answer_options AS selected ON selected.user_answer_id = answer.id
+         LEFT JOIN question_options AS selected_option ON selected_option.id = selected.question_option_id
+         WHERE assignment.interview_id = $1
+         GROUP BY assignment.question_order, question.text, question.difficulty, answer.is_correct
+         ORDER BY assignment.question_order`,
+        [parsedId.data],
+      );
+      const wrongAnswers = rows.rows.filter((row) => !row.is_correct).map((row) => ({
+        questionOrder: Number(row.order), question: row.question, difficulty: row.difficulty,
+        correctAnswer: row.correct_answer, selectedAnswer: row.selected_answer ?? 'Ответ не выбран',
+      }));
+      if (wrongAnswers.length === 0) {
+        return response.json({ data: { summary: 'Отличная работа — ошибок нет. Все ответы верны!', explanations: [] } });
+      }
+      const analysis = await explainAnswers(wrongAnswers);
+      return response.json({ data: analysis });
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && ['AI_NOT_CONFIGURED', 'AI_UNAVAILABLE', 'AI_QUOTA_EXCEEDED', 'AI_INVALID_RESPONSE'].includes(String(error.code))) {
+        const code = String(error.code);
+        const status = code === 'AI_NOT_CONFIGURED' ? 503 : code === 'AI_QUOTA_EXCEEDED' ? 429 : 502;
+        return sendApiError(response, status, code, code === 'AI_NOT_CONFIGURED'
+            ? 'AI-помощник не настроен: добавьте GROQ_API_KEY в .env.'
+          : code === 'AI_QUOTA_EXCEEDED'
+            ? 'Достигнут бесплатный лимит Groq API. Проверьте квоты аккаунта и попробуйте позже.'
+          : 'Не удалось получить разбор от AI. Попробуйте ещё раз.');
+      }
       return respondToError(error, response);
     }
   });

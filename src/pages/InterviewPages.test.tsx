@@ -2,9 +2,10 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createInterview, getCurrentInterviewQuestion, getSkills, submitInterviewAnswer } from '../api/interviews.js';
+import { createInterview, getCurrentInterviewQuestion, getInterviewAnalysis, getInterviewResult, getSkills, submitInterviewAnswer } from '../api/interviews.js';
 import { InterviewStartPage } from './InterviewStartPage.js';
 import { InterviewPage } from './InterviewPage.js';
+import { InterviewResultPage } from './InterviewResultPage.js';
 
 vi.mock('../auth/AuthContext.js', () => ({
   useAuth: () => ({ accessToken: 'access-token' }),
@@ -14,6 +15,8 @@ vi.mock('../api/interviews.js', () => ({
   getCurrentInterviewQuestion: vi.fn(),
   getSkills: vi.fn(),
   submitInterviewAnswer: vi.fn(),
+  getInterviewAnalysis: vi.fn(),
+  getInterviewResult: vi.fn(),
 }));
 
 beforeEach(() => vi.clearAllMocks());
@@ -119,5 +122,26 @@ describe('interview pages', () => {
     await actor.click(await screen.findByLabelText('Final answer'));
     await actor.click(screen.getByRole('button', { name: 'Ответить' }));
     expect(await screen.findByText('Result page opened')).toBeInTheDocument();
+  });
+
+  it('shows an AI loading state and then the explanation for a wrong answer', async () => {
+    vi.mocked(getInterviewResult).mockResolvedValueOnce({
+      id: 42, skill: 'JavaScript', difficulty: 'EASY', score: 0, userLevel: 'Junior', correctAnswers: 0, totalQuestions: 1,
+      questions: [{ id: 12, order: 1, text: 'Что возвращает then?', score: 0, isCorrect: false, options: [
+        { id: 1, text: 'Promise', isCorrect: true, selected: false }, { id: 2, text: 'undefined', isCorrect: false, selected: true },
+      ] }],
+    });
+    let finishAnalysis!: (analysis: { summary: string; explanations: Array<{ questionOrder: number; explanation: string }> }) => void;
+    vi.mocked(getInterviewAnalysis).mockReturnValueOnce(new Promise((resolve) => { finishAnalysis = resolve; }));
+
+    render(<MemoryRouter initialEntries={['/interview/42/result']}><Routes>
+      <Route path="/interview/:id/result" element={<InterviewResultPage />} />
+    </Routes></MemoryRouter>);
+
+    expect(await screen.findByText(/Готовим разбор ошибок/)).toBeInTheDocument();
+    finishAnalysis({ summary: 'Повтори работу промисов.', explanations: [{ questionOrder: 1, explanation: 'then создаёт и возвращает новый Promise.' }] });
+    expect(await screen.findByText('then создаёт и возвращает новый Promise.')).toBeInTheDocument();
+    expect(screen.getByText('Promise · правильный ответ')).toBeInTheDocument();
+    expect(screen.getByText('Повтори работу промисов.')).toBeInTheDocument();
   });
 });

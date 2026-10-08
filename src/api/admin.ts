@@ -30,8 +30,29 @@ export interface AdminQuestion {
   options?: Array<{ id: number | string; text: string; isCorrect: boolean }>;
 }
 
-export function getAdminStatistics(token: string) {
-  return adminRequest<Envelope<{ users: number; questions: number; skills: number; interviews: number; averageScore: number }>>('/api/admin/statistics', token);
+export interface AdminStatistics {
+  users: number;
+  questions: number;
+  skills: number;
+  interviews: number;
+  averageScore: number | null;
+  newUsers: number;
+  periodInterviews: number;
+  completedInterviews: number;
+  averageInterviewSeconds: number | null;
+  activeUsers: number;
+  onlineUsers: number;
+  trackedSessions: number;
+  averageSessionSeconds: number | null;
+  trackingSince: string | null;
+  days: number;
+  daily: Array<{ date: string; registrations: number; interviews: number }>;
+  topics: Array<{ name: string; interviews: number; completed: number; averageScore: number | null }>;
+  difficulty: Array<{ difficulty: AdminQuestion['difficulty']; count: number }>;
+}
+
+export function getAdminStatistics(token: string, days = 30) {
+  return adminRequest<Envelope<AdminStatistics>>(`/api/admin/statistics?days=${days}`, token);
 }
 
 export function getAdminUsers(token: string, search = '') {

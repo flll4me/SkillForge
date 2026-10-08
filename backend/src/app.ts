@@ -8,11 +8,17 @@ import { createQuestionsRouter } from './routes/questions.js';
 import type { Database } from './types/database.js';
 import { sendApiError } from './utils/api-error.js';
 import { config } from './config.js';
+import type { AnswerForExplanation, AnswerExplanationResult } from './services/answer-explainer.js';
 
 const supportedTracks = new Set(['Frontend', 'Backend', 'Fullstack']);
 const supportedLevels = new Set(['Junior', 'Junior+', 'Middle']);
 
-export function createApp(database: Database, jwtSecret = 'test-only-secret', interviewQuestionCount = config.interviewQuestionCount) {
+export function createApp(
+  database: Database,
+  jwtSecret = 'test-only-secret',
+  interviewQuestionCount = config.interviewQuestionCount,
+  explainAnswers?: (answers: AnswerForExplanation[]) => Promise<AnswerExplanationResult>,
+) {
   const app = express();
   app.use(express.json({ limit: '32kb' }));
   app.use('/api/auth', createAuthRouter(database, jwtSecret));
@@ -60,7 +66,7 @@ export function createApp(database: Database, jwtSecret = 'test-only-secret', in
     }
   });
 
-  app.use('/api/interviews', createInterviewRouter(database, jwtSecret, interviewQuestionCount));
+  app.use('/api/interviews', createInterviewRouter(database, jwtSecret, interviewQuestionCount, explainAnswers));
 
   app.use((_request, response) => sendApiError(response, 404, 'NOT_FOUND', 'The requested resource was not found.'));
 

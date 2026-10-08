@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App.js';
@@ -42,6 +43,8 @@ const admin = { ...user, role: 'ADMIN' };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.localStorage.clear();
+  document.documentElement.removeAttribute('data-theme');
   getUserStatisticsMock.mockResolvedValue({ completedInterviews: 0, averageScore: 0, bestScore: 0, recentInterview: null });
   getUserSkillsMock.mockResolvedValue([]);
   getAdminSkillsMock.mockResolvedValue({ data: [{ id: 2, name: 'JavaScript', description: '', isActive: true }] });
@@ -70,5 +73,22 @@ describe('question bank access', () => {
     expect(await screen.findByRole('heading', { name: 'Банк вопросов' })).toBeInTheDocument();
     expect(await screen.findByText(/Вопрос только для администраторов/)).toBeInTheDocument();
     expect(getAdminQuestionsMock).toHaveBeenCalledWith('admin-token');
+  });
+});
+
+describe('appearance theme', () => {
+  it('applies the saved theme and persists a new selection', async () => {
+    window.localStorage.setItem('skillforge-theme', 'light');
+    const user = userEvent.setup();
+
+    render(<MemoryRouter><App /></MemoryRouter>);
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light');
+    const themeButton = screen.getByRole('button', { name: 'Переключить на тёмную тему' });
+    await user.click(themeButton);
+
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
+    expect(window.localStorage.getItem('skillforge-theme')).toBe('dark');
+    expect(screen.getByRole('button', { name: 'Переключить на светлую тему' })).toBeInTheDocument();
   });
 });

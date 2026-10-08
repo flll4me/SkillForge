@@ -144,10 +144,23 @@ export interface InterviewResult {
   }>;
 }
 
+export interface InterviewAnalysis {
+  summary: string;
+  explanations: Array<{ questionOrder: number; explanation: string }>;
+}
+
 export function getInterviewResult(accessToken: string, interviewId: string) {
   return authorizedRequest<InterviewResult>(
     `/api/interviews/${encodeURIComponent(interviewId)}/result`,
     accessToken,
+  );
+}
+
+export function getInterviewAnalysis(accessToken: string, interviewId: string) {
+  return authorizedRequest<InterviewAnalysis>(
+    `/api/interviews/${encodeURIComponent(interviewId)}/analysis`,
+    accessToken,
+    { method: 'POST', body: JSON.stringify({}) },
   );
 }
 

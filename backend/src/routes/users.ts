@@ -13,6 +13,30 @@ export function createUsersRouter(database: Database, jwtSecret: string) {
   const router = Router();
   router.use(requireAuth(jwtSecret));
 
+  router.post('/me/activity', async (request, response) => {
+    const parsed = z.object({ sessionId: z.uuid(), activeSeconds: z.number().int().min(0).max(86400) }).safeParse(request.body);
+    if (!parsed.success) return sendApiError(response, 400, 'VALIDATION_ERROR', 'Invalid activity sample.');
+    try {
+      const result = await database.query(
+        `INSERT INTO activity_sessions (id, user_id)
+         SELECT $1, id FROM users WHERE id = $2 AND role = 'USER' AND status = 'ACTIVE'
+         ON CONFLICT (id) DO UPDATE SET
+           active_seconds = LEAST(
+             GREATEST(activity_sessions.active_seconds, $3),
+             activity_sessions.active_seconds + LEAST(20, GREATEST(0, FLOOR(EXTRACT(EPOCH FROM NOW() - activity_sessions.last_seen_at))))::int
+           ),
+           last_seen_at = NOW()
+         WHERE activity_sessions.user_id = EXCLUDED.user_id
+         RETURNING id`,
+        [parsed.data.sessionId, request.auth!.userId, parsed.data.activeSeconds],
+      );
+      if (!result.rows.length) return sendApiError(response, 403, 'FORBIDDEN', 'Activity sample was not accepted.');
+      return response.status(204).end();
+    } catch {
+      return sendApiError(response, 503, 'DATABASE_UNAVAILABLE', 'Activity is temporarily unavailable.');
+    }
+  });
+
   router.get('/me', async (request, response) => {
     try {
       const result = await database.query(
