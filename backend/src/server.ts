@@ -3,7 +3,6 @@ import { config } from './config.js';
 import { pool } from './db/pool.js';
 
 const app = createApp(pool, config.jwtSecret);
-
 const port = Number(process.env.PORT) || config.port;
 
 const server = app.listen(port, '0.0.0.0', () => {
