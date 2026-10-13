@@ -1,4 +1,5 @@
 import express from 'express';
+import { resolve } from 'node:path';
 import { createAuthRouter } from './routes/auth.js';
 import { createInterviewRouter } from './routes/interviews.js';
 import { createSkillsRouter } from './routes/skills.js';
@@ -18,6 +19,7 @@ export function createApp(
   jwtSecret = 'test-only-secret',
   interviewQuestionCount = config.interviewQuestionCount,
   explainAnswers?: (answers: AnswerForExplanation[]) => Promise<AnswerExplanationResult>,
+  frontendDirectory?: string,
 ) {
   const app = express();
   app.use(express.json({ limit: '32kb' }));
@@ -67,6 +69,14 @@ export function createApp(
   });
 
   app.use('/api/interviews', createInterviewRouter(database, jwtSecret, interviewQuestionCount, explainAnswers));
+
+  if (frontendDirectory) {
+    app.use(express.static(frontendDirectory));
+    app.get('/{*path}', (request, response, next) => {
+      if (request.path === '/api' || request.path.startsWith('/api/') || !request.accepts('html')) return next();
+      return response.sendFile(resolve(frontendDirectory, 'index.html'));
+    });
+  }
 
   app.use((_request, response) => sendApiError(response, 404, 'NOT_FOUND', 'The requested resource was not found.'));
 

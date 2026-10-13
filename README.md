@@ -54,6 +54,18 @@ The checked-in Compose defaults are for local development only. Set a unique `JW
 
 ## Tests and builds
 
+## Render deployment
+
+Deploy the repository root as a Node web service with build command
+`npm ci && npm --prefix backend ci && npm run build:render` and start command
+`npm run start:render`. Configure `DATABASE_URL` with the Render PostgreSQL
+connection URL and set `JWT_SECRET`. The start command applies pending database
+migrations before starting the API. The API also serves the built React app and
+supports direct navigation to frontend routes. Use `/api/health` as the health
+check path to verify database connectivity.
+
+## Validation
+
 ```powershell
 npm run test:run
 npm run test:api

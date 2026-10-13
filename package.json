@@ -7,6 +7,8 @@
     "dev": "vite",
     "dev:api": "npm --prefix backend run dev",
     "build:api": "npm --prefix backend run build",
+    "build:render": "npm run build && npm run build:api",
+    "start:render": "node backend/dist/db/migrate.js && npm run start:api",
     "start:api": "npm --prefix backend start",
     "build": "vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
