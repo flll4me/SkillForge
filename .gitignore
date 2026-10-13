@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.npm-cache/
+.vitest-tmp/
+.env
+__pycache__/
+.pytest_cache/
+.venv/
+
+# Environment files may contain secrets
+.env*
+!.env.example
+

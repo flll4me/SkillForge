@@ -1,0 +1,10 @@
+node_modules
+backend/node_modules
+backend/dist
+dist
+.npm-cache
+.vitest-tmp
+.git
+.env
+backend/.env
+*.log
